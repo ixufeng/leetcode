@@ -1,4 +1,4 @@
-package com.yx.leecode;
+package com.yx.leecode.sum;
 
 import java.util.List;
 
