@@ -2,6 +2,7 @@ package com.yx.leecode.aqs;
 
 import sun.misc.Unsafe;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -83,18 +84,28 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     protected final boolean compareAndSetState(int expect, int update) {
-        // See below for intrinsics setup to support this
         return unsafe.compareAndSwapInt(this, stateOffset, expect, update);
     }
 
+    /**
+     * 线程自旋超时时间
+     */
     static final long spinForTimeoutThreshold = 1000L;
 
+    /**
+     * cas入队
+     *
+     * @param node
+     * @return
+     */
     private Node enq(final Node node) {
         for (; ; ) {
             Node t = tail;
-            if (t == null) { // Must initialize
-                if (compareAndSetHead(new Node()))
+            if (t == null) {
+                //初始化头、尾节点
+                if (compareAndSetHead(new Node())) {
                     tail = head;
+                }
             } else {
                 node.prev = t;
                 if (compareAndSetTail(t, node)) {
@@ -105,17 +116,28 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
+    /**
+     * 加入等待队列
+     *
+     * @param mode
+     * @return
+     */
     private Node addWaiter(Node mode) {
         Node node = new Node(Thread.currentThread(), mode);
-        // Try the fast path of enq; backup to full enq on failure
+        // 尝试最快的方式入队; 失败则进入完整的入队方法enq();
         Node pred = tail;
+        //等待队列不为空，尝试一次性入队成功
         if (pred != null) {
             node.prev = pred;
+            //cas设置新的末尾节点
             if (compareAndSetTail(pred, node)) {
                 pred.next = node;
                 return node;
             }
         }
+
+        //tail节点为空或者设置新的tail节点失败进入enq逻辑
+        //阻塞增加的逻辑
         enq(node);
         return node;
     }
@@ -127,21 +149,24 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     private void unparkSuccessor(Node node) {
-
         int ws = node.waitStatus;
-        if (ws < 0)
+        if (ws < 0) {
             compareAndSetWaitStatus(node, ws, 0);
-
-
+        }
         Node s = node.next;
         if (s == null || s.waitStatus > 0) {
             s = null;
-            for (Node t = tail; t != null && t != node; t = t.prev)
-                if (t.waitStatus <= 0)
+            //从后往前寻找最近的一个需要un-park的节点
+            for (Node t = tail; t != null && t != node; t = t.prev) {
+                if (t.waitStatus <= 0) {
                     s = t;
+                }
+            }
         }
-        if (s != null)
+        if (s != null) {
             LockSupport.unpark(s.thread);
+        }
+
     }
 
     private void doReleaseShared() {
@@ -166,22 +191,6 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     private void setHeadAndPropagate(Node node, int propagate) {
         Node h = head; // Record old head for check below
         setHead(node);
-        /*
-         * Try to signal next queued node if:
-         *   Propagation was indicated by caller,
-         *     or was recorded (as h.waitStatus either before
-         *     or after setHead) by a previous operation
-         *     (note: this uses sign-check of waitStatus because
-         *      PROPAGATE status may transition to SIGNAL.)
-         * and
-         *   The next node is waiting in shared mode,
-         *     or we don't know, because it appears null
-         *
-         * The conservatism in both of these checks may cause
-         * unnecessary wake-ups, but only when there are multiple
-         * racing acquires/releases, so most need signals now or soon
-         * anyway.
-         */
         if (propagate > 0 || h == null || h.waitStatus < 0 ||
                 (h = head) == null || h.waitStatus < 0) {
             Node s = node.next;
@@ -234,29 +243,28 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
+    /**
+     * 判断节点在尝试获取锁失败后是否应该挂起
+     *
+     * @param pred
+     * @param node
+     * @return
+     */
     private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         int ws = pred.waitStatus;
-        if (ws == Node.SIGNAL)
-            /*
-             * This node has already set status asking a release
-             * to signal it, so it can safely park.
-             */
+        if (ws == Node.SIGNAL) {
             return true;
+        }
+
         if (ws > 0) {
-            /*
-             * Predecessor was cancelled. Skip over predecessors and
-             * indicate retry.
-             */
+            //节点被取消
+            //删除节点
             do {
                 node.prev = pred = pred.prev;
             } while (pred.waitStatus > 0);
             pred.next = node;
         } else {
-            /*
-             * waitStatus must be 0 or PROPAGATE.  Indicate that we
-             * need a signal, but don't park yet.  Caller will need to
-             * retry to make sure it cannot acquire before parking.
-             */
+            //status == 0
             compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
         }
         return false;
@@ -271,6 +279,11 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         return Thread.interrupted();
     }
 
+    /**
+     * @param node
+     * @param arg
+     * @return
+     */
     final boolean acquireQueued(final Node node, int arg) {
         boolean failed = true;
         try {
@@ -279,13 +292,15 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                 final Node p = node.predecessor();
                 if (p == head && tryAcquire(arg)) {
                     setHead(node);
-                    p.next = null; // help GC
+                    // help GC
+                    p.next = null;
                     failed = false;
                     return interrupted;
                 }
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                        parkAndCheckInterrupt())
+                //park
+                if (shouldParkAfterFailedAcquire(p, node) && parkAndCheckInterrupt()) {
                     interrupted = true;
+                }
             }
         } finally {
             if (failed)
@@ -316,30 +331,52 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
+    /**
+     * 带有超时时间的Acquire
+     *
+     * @param arg
+     * @param nanosTimeout
+     * @return
+     * @throws InterruptedException
+     */
     private boolean doAcquireNanos(int arg, long nanosTimeout)
             throws InterruptedException {
-        if (nanosTimeout <= 0L)
+        if (nanosTimeout <= 0L) {
             return false;
+        }
+        //计算终止时间
         final long deadline = System.nanoTime() + nanosTimeout;
+        //将节点加入等待队列
         final Node node = addWaiter(Node.EXCLUSIVE);
+
         boolean failed = true;
         try {
+
             for (; ; ) {
                 final Node p = node.predecessor();
+                //尝试获取锁
                 if (p == head && tryAcquire(arg)) {
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return true;
                 }
+                //计算剩余时间
                 nanosTimeout = deadline - System.nanoTime();
-                if (nanosTimeout <= 0L)
+                //超时退出
+                if (nanosTimeout <= 0L) {
                     return false;
+                }
+
                 if (shouldParkAfterFailedAcquire(p, node) &&
-                        nanosTimeout > spinForTimeoutThreshold)
+                        nanosTimeout > spinForTimeoutThreshold) {
+                    //系统调用
                     LockSupport.parkNanos(this, nanosTimeout);
-                if (Thread.interrupted())
+                }
+                if (Thread.interrupted()) {
                     throw new InterruptedException();
+                }
+
             }
         } finally {
             if (failed)
@@ -457,22 +494,31 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
 
     public final void acquire(int arg) {
         if (!tryAcquire(arg) &&
-                acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+                acquireQueued(addWaiter(Node.EXCLUSIVE), arg)) {
             selfInterrupt();
+        }
+
     }
 
     public final void acquireInterruptibly(int arg)
             throws InterruptedException {
-        if (Thread.interrupted())
+
+        if (Thread.interrupted()) {
             throw new InterruptedException();
-        if (!tryAcquire(arg))
+        }
+
+        if (!tryAcquire(arg)) {
             doAcquireInterruptibly(arg);
+        }
+
     }
 
     public final boolean tryAcquireNanos(int arg, long nanosTimeout)
             throws InterruptedException {
-        if (Thread.interrupted())
+        //线程已被中断
+        if (Thread.interrupted()) {
             throw new InterruptedException();
+        }
         return tryAcquire(arg) ||
                 doAcquireNanos(arg, nanosTimeout);
     }
@@ -954,7 +1000,11 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+
+//    private static final Unsafe unsafe = Unsafe.getUnsafe();
+
+    private static Unsafe unsafe;
+
     private static final long stateOffset;
     private static final long headOffset;
     private static final long tailOffset;
@@ -963,6 +1013,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
 
     static {
         try {
+
+            Class<?> aClass = Class.forName("sun.misc.Unsafe");
+            Field theUnsafe = aClass.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            unsafe = (Unsafe) theUnsafe.get(null);
+
             stateOffset = unsafe.objectFieldOffset
                     (AbstractQueuedSynchronizer.class.getDeclaredField("state"));
             headOffset = unsafe.objectFieldOffset
@@ -999,4 +1055,6 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                                                    Node update) {
         return unsafe.compareAndSwapObject(node, nextOffset, expect, update);
     }
+
+
 }

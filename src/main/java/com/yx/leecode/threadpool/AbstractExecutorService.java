@@ -5,11 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
 
-/**
- * @author xufeng
- * Create Date: 2020-03-15 20:05
- * 抽象类，实现部分基础功能
- **/
+
 public abstract class AbstractExecutorService implements ExecutorService {
 
     protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
@@ -22,8 +18,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
 
     public Future<?> submit(Runnable task) {
         if (task == null) throw new NullPointerException();
-        //包装成RunnableFuture
-        //todo runnableFuture实现
+
         RunnableFuture<Void> ftask = newTaskFor(task, null);
         execute(ftask);
         return ftask;
@@ -36,13 +31,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
         return ftask;
     }
 
-    /**
-     * 本质和submit(runnable) 一样，关键在于runnableFuture的实现
-     *
-     * @param task
-     * @param <T>
-     * @return
-     */
+
     public <T> Future<T> submit(Callable<T> task) {
         if (task == null) throw new NullPointerException();
         RunnableFuture<T> ftask = newTaskFor(task);
@@ -58,13 +47,11 @@ public abstract class AbstractExecutorService implements ExecutorService {
         ArrayList<Future<T>> futures = new ArrayList<>(tasks.size());
         boolean done = false;
         try {
-            //遍历任务加入到返回列表，然后调用execute
             for (Callable<T> t : tasks) {
                 RunnableFuture<T> f = newTaskFor(t);
                 futures.add(f);
                 execute(f);
             }
-            //等待所有任务完成后返回
             for (Future<T> f : futures) {
                 if (!f.isDone()) {
                     try {
@@ -76,7 +63,6 @@ public abstract class AbstractExecutorService implements ExecutorService {
             done = true;
             return futures;
         } finally {
-            //如果发生则取消所有任务
             if (!done) {
                 for (Future<T> future : futures) future.cancel(true);
             }
@@ -101,7 +87,6 @@ public abstract class AbstractExecutorService implements ExecutorService {
 
             for (int i = 0; i < size; i++) {
                 execute((Runnable) futures.get(i));
-                //在任务提交的时候就不断的检查是否已经超时
                 nanos = deadline - System.nanoTime();
                 if (nanos <= 0L)
                     return futures;
@@ -160,7 +145,6 @@ public abstract class AbstractExecutorService implements ExecutorService {
 //        if (ntasks == 0)
 //            throw new IllegalArgumentException();
 //        ArrayList<Future<T>> futures = new ArrayList<>(ntasks);
-//        //涉及到一个新的service，基于blockQueue实现任务完成的监控
 //        ExecutorCompletionService<T> ecs =
 //                new ExecutorCompletionService<T>(this);
 //        try {

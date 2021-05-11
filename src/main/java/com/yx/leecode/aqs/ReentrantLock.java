@@ -36,7 +36,7 @@ public class ReentrantLock implements Lock {
             final Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
-                //判断是否有前驱
+                //判断是否有前驱--和不公平锁不同的地方之一
                 if (!hasQueuedPredecessors() &&
                         compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
@@ -57,6 +57,7 @@ public class ReentrantLock implements Lock {
         sync = new NonfairSync();
     }
 
+
     public ReentrantLock(boolean fair) {
         sync = fair ? new FairSync() : new NonfairSync();
     }
@@ -73,17 +74,17 @@ public class ReentrantLock implements Lock {
 
     @Override
     public boolean tryLock() {
-        return false;
+        return sync.tryAcquire(1);
     }
 
     @Override
     public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
-        return false;
+        return sync.tryAcquireNanos(1, unit.toNanos(time));
     }
 
     @Override
     public void unlock() {
-
+        sync.release(1);
     }
 
     @Override
@@ -134,6 +135,7 @@ public class ReentrantLock implements Lock {
             if (Thread.currentThread() != getExclusiveOwnerThread()) {
                 throw new IllegalMonitorStateException();
             }
+            //线程安全区域
             boolean free = false;
             if (c == 0) {
                 free = true;
@@ -144,8 +146,6 @@ public class ReentrantLock implements Lock {
         }
 
         protected final boolean isHeldExclusively() {
-            // While we must in general read state before owner,
-            // we don't need to do so to check if current thread is owner
             return getExclusiveOwnerThread() == Thread.currentThread();
         }
 

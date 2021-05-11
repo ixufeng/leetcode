@@ -6,17 +6,34 @@ package com.yx.leecode;
  **/
 public class SharesDeal {
 
-    public int maxProfit(int[] prices) {
-        int min = Integer.MAX_VALUE;
-        int max = 0;
-        for (int i = 0; i < prices.length; i++) {
-            if (prices[i] < min) {
-                min = prices[i];
-            } else {
-                max = Math.max(max, prices[i] - min);
+    public static void sortColors(int[] nums) {
+        int left = -1; //0的边界，包括
+        int right = nums.length; //2的边界，包括
+
+        for(int cur = 0;cur< right;cur++) {
+            int curVal = nums[cur];
+            if(curVal == 0) {
+                left++;
+                exchange(left,cur,nums);
+            }else if(curVal == 2) {
+                right--;
+                exchange(right,cur,nums);
+            }
+            if(nums[cur] != 1 && cur > left) {
+                cur--;
             }
         }
-        return max;
+    }
 
+    public static void exchange(int from,int to,int[] nums) {
+        int temp = nums[from];
+        nums[from] = nums[to];
+        nums[to] = temp;
+    }
+
+    public static void main(String[] args) {
+        int[] nums = new int[]{2,0,2,1,1,0};
+        sortColors(nums);
+        System.out.println();
     }
 }
