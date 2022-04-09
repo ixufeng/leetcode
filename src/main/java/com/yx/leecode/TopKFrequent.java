@@ -30,7 +30,9 @@ public class TopKFrequent {
 
         // 倒序遍历数组获取出现顺序从大到小的排列
         for (int i = list.length - 1; i >= 0 && res.size() < k; i--) {
-            if (list[i] == null) continue;
+            if (list[i] == null) {
+                continue;
+            }
             res.addAll(list[i]);
         }
         int[] arr = new int[res.size()];

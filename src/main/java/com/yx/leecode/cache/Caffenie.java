@@ -22,6 +22,8 @@ public class Caffenie {
             .maximumSize(100)
             .build();
 
+    public final static Integer NULL_OBJ = Integer.MAX_VALUE;
+
     public static void main(String[] args) {
 
         for (int i = 0; i < 101; i++) {
@@ -43,18 +45,17 @@ public class Caffenie {
         items.add("918");
         items.add("928");
         items.add("938");
+        FLASH_GOODS_CACHE.put("938", 1);
 
         Map<String, Integer> all = FLASH_GOODS_CACHE.getAll(items, (missList) -> {
             HashMap<String, Integer> missMap = new HashMap<>();
             for (String s : missList) {
-                missMap.put(s, Integer.valueOf(s));
+                missMap.put(s, NULL_OBJ);
             }
             return missMap;
         });
 
-        for (Integer value : all.values()) {
-            System.out.println(value);
-        }
+        all.values().stream().filter(item -> item != NULL_OBJ).forEach(System.out::println);
 
 
         try {
@@ -63,8 +64,5 @@ public class Caffenie {
             e.printStackTrace();
         }
 
-        System.out.println(FLASH_GOODS_CACHE.getIfPresent("918"));
-        System.out.println(FLASH_GOODS_CACHE.getIfPresent("928"));
-        System.out.println(FLASH_GOODS_CACHE.getIfPresent("938"));
     }
 }
